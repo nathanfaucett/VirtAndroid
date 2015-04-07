@@ -1,0 +1,34 @@
+{
+  "name": "virt-android-test",
+  "version": "0.0.1",
+  "description": "virt Android",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nathanfaucett/virt-android.git"
+  },
+  "main": "src/index.js",
+  "keywords": [
+    "virt-android",
+    "virt-android.js"
+  ],
+  "scripts": {
+    "build": "comn -f src/index.js -o index.js"
+  },
+  "author": "Nathan Faucett",
+  "license": "BSD-2-Clause",
+  "readmeFilename": "README.md",
+  "devDependencies": {
+    "grunt": "^0.4.5",
+    "grunt-contrib-jshint": "^0.10.0",
+    "grunt-jsbeautifier": "^0.2.7"
+  },
+  "dependencies": {
+    "event_emitter": "git://github.com/nathanfaucett/event_emitter",
+    "map": "git://github.com/nathanfaucett/map",
+    "messenger_android": "git://github.com/nathanfaucett/messenger_android",
+    "prop_types": "git://github.com/nathanfaucett/prop_types",
+    "values": "git://github.com/nathanfaucett/values",
+    "virt": "git://github.com/nathanfaucett/virt",
+    "virt-android": "git://github.com/nathanfaucett/virt-android"
+  }
+}
