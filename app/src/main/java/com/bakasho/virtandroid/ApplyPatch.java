@@ -26,6 +26,9 @@ public class ApplyPatch {
             case Consts.MOUNT:
                 ApplyPatch.mount((JSONObject)patch.get("next"), id, containerView);
                 break;
+            case Consts.UNMOUNT:
+                ApplyPatch.unmount(id, containerView);
+                break;
             case Consts.INSERT:
                 ApplyPatch.insert(patch, id);
                 break;
@@ -53,6 +56,8 @@ public class ApplyPatch {
             containerView.addView(view);
         }
     }
+
+    private static void unmount(String id, ViewGroup containerView) {}
 
     private static void insert(JSONObject patch, String id) {}
 

@@ -4,10 +4,6 @@ android {
     compileSdkVersion 21
     buildToolsVersion "21.1.2"
 
-    aaptOptions {
-        ignoreAssetsPattern "node_modules"
-    }
-
     defaultConfig {
         applicationId "com.bakasho.virtandroid"
         minSdkVersion 11
@@ -20,6 +16,9 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
+    }
+    aaptOptions {
+        ignoreAssetsPattern 'node_modules'
     }
 }
 
