@@ -9,7 +9,6 @@ import android.webkit.WebView;
 
 import com.bakasho.messenger.Messenger;
 
-import org.json.JSONException;
 
 /**
  * Created by nathan on 4/8/15.

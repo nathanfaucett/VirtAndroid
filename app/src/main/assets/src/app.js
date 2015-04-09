@@ -30,7 +30,7 @@ AppPrototype.getChildContext = function() {
 
 AppPrototype.render = function() {
     return (
-        virt.createView("LinearLayout",
+        virt.createView("View",
             virt.createView(TodoForm),
             virt.createView(TodoList)
         )

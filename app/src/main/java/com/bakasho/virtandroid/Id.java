@@ -1,11 +1,7 @@
 package com.bakasho.virtandroid;
 
-import android.util.Log;
-
 import org.json.JSONException;
 import org.json.JSONObject;
-
-import java.util.Objects;
 
 /**
  * Created by nathan on 4/6/15.

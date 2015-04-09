@@ -50,7 +50,7 @@ public class ApplyPatch {
     private static void remove(JSONObject patch, String id) {}
 
     private static void mount(JSONObject next, String id, ViewGroup containerView) throws JSONException {
-        View view = RenderJSON.call(next, id, containerView.getContext());
+        View view = Render.call(next, id, containerView.getContext());
 
         if (view != null) {
             containerView.addView(view);

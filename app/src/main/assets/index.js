@@ -41,7 +41,7 @@
 
         var virt = require(1),
             virtAndroid = require(57),
-            App = require(62);
+            App = require(68);
 
         virtAndroid.androidInterface = global.__android__;
         virtAndroid.render(virt.createView(App));
@@ -1276,7 +1276,7 @@
 
 
         function UnmountPatch() {
-            this.type = consts.MOUNT;
+            this.type = consts.UNMOUNT;
             this.id = null;
         }
         createPool(UnmountPatch);
@@ -1645,18 +1645,21 @@
                 this.isTopLevel = true;
             }
 
-            props = this.__processProps(currentView.props);
+            props = currentView.props;
             children = currentView.children;
-            context = this.__processContext(currentView.__context);
+            context = currentView.__context;
 
             component = new ComponentClass(props, children, context);
+
+            this.component = component;
+
+            props = this.__processProps(props);
+            context = this.__processContext(context);
 
             component.__node = this;
             component.props = props;
             component.children = children;
             component.context = context;
-
-            this.component = component;
         };
 
         NodePrototype.mount = function(transaction) {
@@ -1926,7 +1929,7 @@
         NodePrototype.__processProps = function(props) {
             var propTypes;
 
-            if (process.env.NODE_ENV === "development") {
+            if (process.env.NODE_ENV !== "production") {
                 propTypes = this.currentView.type.propTypes;
 
                 if (propTypes) {
@@ -1965,7 +1968,7 @@
             var maskedContext = this.__maskContext(context),
                 contextTypes;
 
-            if (process.env.NODE_ENV === "development") {
+            if (process.env.NODE_ENV !== "production") {
                 contextTypes = this.currentView.type.contextTypes;
 
                 if (contextTypes) {
@@ -1984,7 +1987,7 @@
             if (childContext) {
                 childContextTypes = this.currentView.type.childContextTypes;
 
-                if (process.env.NODE_ENV === "development") {
+                if (process.env.NODE_ENV !== "production") {
                     if (childContextTypes) {
                         this.__checkTypes(childContextTypes, childContext);
                     }
@@ -2261,7 +2264,7 @@
             function NativeComponent(props, children) {
                 Component.call(this, props, children);
             }
-            Component.extend(NativeComponent);
+            Component.extend(NativeComponent, type);
 
             NativeComponent.prototype.render = function() {
                 return new View(type, null, null, this.props, this.children, null, null);
@@ -2823,6 +2826,12 @@
             AndroidAdaptor = require(58);
 
 
+        require(62);
+        require(65);
+        require(66);
+        require(67);
+
+
         var virtAndroid = exports,
             root = null;
 
@@ -3108,10 +3117,213 @@
     },
     function(require, exports, module, global) {
 
+        var process = require(39);
         var virt = require(1),
-            propTypes = require(63),
-            TodoList = require(66),
-            TodoForm = require(72);
+            some = require(63),
+            isNotPrimitive = require(64);
+
+
+        var View = virt.View,
+            Component = virt.Component,
+            ButtonPrototype;
+
+
+        virt.registerNativeComponent("Button", Button);
+
+
+        function Button(props, children, context) {
+
+            Component.call(this, props, children, context);
+
+            if (process.env.NODE_ENV !== "production") {
+                if (some(children, isNotPrimitive)) {
+                    throw new Error("TextView: children must be primitives");
+                }
+            }
+
+            if (children.length > 1) {
+                children[0] = children.join("");
+            }
+        }
+        Component.extend(Button, "Button");
+
+        ButtonPrototype = Button.prototype;
+
+        ButtonPrototype.render = function() {
+            return new View("Button", null, null, this.props, this.children, null, null);
+        };
+
+
+    },
+    function(require, exports, module, global) {
+
+        var keys = require(14),
+            isNullOrUndefined = require(4),
+            fastBindThis = require(17),
+            isArrayLike = require(18);
+
+
+        function someArray(array, callback) {
+            var i = array.length;
+
+            while (i--) {
+                if (callback(array[i], i)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        function someObject(object, callback) {
+            var objectKeys = keys(object),
+                i = objectKeys.length,
+                key;
+
+            while (i--) {
+                key = objectKeys[i];
+
+                if (callback(object[key], key)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        module.exports = function some(object, callback, thisArg) {
+            callback = isNullOrUndefined(thisArg) ? callback : fastBindThis(callback, thisArg, 2);
+            return isArrayLike(object) ? someArray(object, callback) : someObject(object, callback);
+        };
+
+
+    },
+    function(require, exports, module, global) {
+
+        var isPrimitive = require(3);
+
+
+        module.exports = isNotPrimitive;
+
+
+        function isNotPrimitive(child) {
+            return !isPrimitive(child);
+        }
+
+
+    },
+    function(require, exports, module, global) {
+
+        var process = require(39);
+        var virt = require(1);
+
+
+        var View = virt.View,
+            Component = virt.Component,
+            InputPrototype;
+
+
+        virt.registerNativeComponent("Input", Input);
+
+
+        function Input(props, children, context) {
+
+            Component.call(this, props, children, context);
+
+            if (process.env.NODE_ENV !== "production") {
+                if (children.length > 0) {
+                    throw new Error("Input: input can't have children");
+                }
+            }
+        }
+        Component.extend(Input, "Input");
+
+        InputPrototype = Input.prototype;
+
+        InputPrototype.getValue = function(callback) {
+            this.emitMessage("__Input:getValue__", {
+                id: this.getId()
+            }, callback);
+        };
+
+        InputPrototype.render = function() {
+            return new View("Input", null, null, this.props, this.children, null, null);
+        };
+
+
+    },
+    function(require, exports, module, global) {
+
+        var process = require(39);
+        var virt = require(1),
+            some = require(63),
+            isNotPrimitive = require(64);
+
+
+        var View = virt.View,
+            Component = virt.Component,
+            TextViewPrototype;
+
+
+        virt.registerNativeComponent("TextView", TextView);
+
+
+        function TextView(props, children, context) {
+
+            Component.call(this, props, children, context);
+
+            if (process.env.NODE_ENV !== "production") {
+                if (some(children, isNotPrimitive)) {
+                    throw new Error("TextView: children must be primitives");
+                }
+            }
+
+            if (children.length > 1) {
+                children[0] = children.join("");
+            }
+        }
+        Component.extend(TextView, "TextView");
+
+        TextViewPrototype = TextView.prototype;
+
+        TextViewPrototype.render = function() {
+            return new View("TextView", null, null, this.props, this.children, null, null);
+        };
+
+
+    },
+    function(require, exports, module, global) {
+
+        var virt = require(1);
+
+
+        var VirtView = virt.View,
+            Component = virt.Component,
+            ViewPrototype;
+
+
+        virt.registerNativeComponent("View", View);
+
+
+        function View(props, children, context) {
+            Component.call(this, props, children, context);
+        }
+        Component.extend(View, "View");
+
+        ViewPrototype = View.prototype;
+
+        ViewPrototype.render = function() {
+            return new VirtView("View", null, null, this.props, this.children, null, null);
+        };
+
+
+    },
+    function(require, exports, module, global) {
+
+        var virt = require(1),
+            propTypes = require(69),
+            TodoList = require(72),
+            TodoForm = require(78);
 
 
         var AppPrototype;
@@ -3140,7 +3352,7 @@
 
         AppPrototype.render = function() {
             return (
-                virt.createView("LinearLayout",
+                virt.createView("View",
                     virt.createView(TodoForm),
                     virt.createView(TodoList)
                 )
@@ -3152,9 +3364,9 @@
     function(require, exports, module, global) {
 
         var isArray = require(6),
-            isRegExp = require(64),
+            isRegExp = require(70),
             isNullOrUndefined = require(4),
-            emptyFunction = require(65),
+            emptyFunction = require(71),
             isFunction = require(5),
             has = require(12),
             indexOf = require(40);
@@ -3374,9 +3586,9 @@
 
         var virt = require(1),
             map = require(13),
-            dispatcher = require(67),
-            TodoStore = require(69),
-            TodoItem = require(71);
+            dispatcher = require(73),
+            TodoStore = require(75),
+            TodoItem = require(77);
 
 
         var TodoListPrototype;
@@ -3424,6 +3636,7 @@
 
         TodoListPrototype.componentDidMount = function() {
             TodoStore.addChangeListener(this.onChange);
+            // this.__onChange();
         };
 
         TodoListPrototype.componentWillUnmount = function() {
@@ -3434,7 +3647,7 @@
             var _this = this;
 
             return (
-                virt.createView("LinearLayout",
+                virt.createView("View",
                     map(this.state.list, function(item) {
                         return virt.createView(TodoItem, {
                             key: item.id,
@@ -3453,7 +3666,7 @@
     },
     function(require, exports, module, global) {
 
-        var EventEmitter = require(68);
+        var EventEmitter = require(74);
 
 
         var dispatcher = module.exports = new EventEmitter(-1),
@@ -3853,9 +4066,9 @@
     },
     function(require, exports, module, global) {
 
-        var EventEmitter = require(68),
-            values = require(70),
-            dispatcher = require(67);
+        var EventEmitter = require(74),
+            values = require(76),
+            dispatcher = require(73);
 
 
         var TodoStore = module.exports = new EventEmitter(-1),
@@ -3981,7 +4194,7 @@
     function(require, exports, module, global) {
 
         var virt = require(1),
-            propTypes = require(63);
+            propTypes = require(69);
 
 
         var TodoItemPrototype;
@@ -4009,8 +4222,8 @@
 
         TodoItemPrototype.render = function() {
             return (
-                virt.createView("LinearLayout",
-                    this.props.text,
+                virt.createView("View",
+                    virt.createView("TextView", this.props.text),
                     virt.createView("Button", {
                         onClick: this.props.onDestroy
                     }, "x")
@@ -4022,9 +4235,9 @@
     },
     function(require, exports, module, global) {
 
-        var virt = require(1);
-        //dispatcher = require(67),
-        //TodoStore = require(69);
+        var virt = require(1),
+            dispatcher = require(73),
+            TodoStore = require(75);
 
 
         var TodoFormPrototype;
@@ -4055,27 +4268,30 @@
         TodoFormPrototype = TodoForm.prototype;
 
         TodoFormPrototype.__onSubmit = function() {
-            /* get text value from android
+            var _this = this;
 
-            if (value) {
-                dispatcher.handleViewAction({
-                    actionType: TodoStore.consts.TODO_CREATE,
-                    text: value
-                });
+            this.refs.name.getValue(function(error, data) {
+                var value = data.value;
 
-                DOMNode.value = "";
+                if (value) {
+                    dispatcher.handleViewAction({
+                        actionType: TodoStore.consts.TODO_CREATE,
+                        text: value
+                    });
 
-                this.setState({
-                    name: ""
-                });
-            }
-            */
+                    _this.setState({
+                        name: ""
+                    });
+                }
+            });
         };
 
         TodoFormPrototype.render = function() {
             return (
-                virt.createView("LinearLayout",
-                    virt.createView("EditText", {
+                virt.createView("View", {
+                        orientation: "horizontal"
+                    },
+                    virt.createView("Input", {
                         type: "text",
                         name: "name",
                         ref: "name",

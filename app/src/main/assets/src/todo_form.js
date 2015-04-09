@@ -1,6 +1,6 @@
-var virt = require("virt");
-//dispatcher = require("./dispatcher"),
-//TodoStore = require("./todo_store");
+var virt = require("virt"),
+    dispatcher = require("./dispatcher"),
+    TodoStore = require("./todo_store");
 
 
 var TodoFormPrototype;
@@ -31,27 +31,30 @@ virt.Component.extend(TodoForm, "TodoForm");
 TodoFormPrototype = TodoForm.prototype;
 
 TodoFormPrototype.__onSubmit = function() {
-    /* get text value from android
+    var _this = this;
 
-    if (value) {
-        dispatcher.handleViewAction({
-            actionType: TodoStore.consts.TODO_CREATE,
-            text: value
-        });
+    this.refs.name.getValue(function(error, data) {
+        var value = data.value;
 
-        DOMNode.value = "";
+        if (value) {
+            dispatcher.handleViewAction({
+                actionType: TodoStore.consts.TODO_CREATE,
+                text: value
+            });
 
-        this.setState({
-            name: ""
-        });
-    }
-    */
+            _this.setState({
+                name: ""
+            });
+        }
+    });
 };
 
 TodoFormPrototype.render = function() {
     return (
-        virt.createView("LinearLayout",
-            virt.createView("EditText", {
+        virt.createView("View", {
+                orientation: "horizontal"
+            },
+            virt.createView("Input", {
                 type: "text",
                 name: "name",
                 ref: "name",

@@ -27,8 +27,8 @@ TodoItem.contextTypes = {
 
 TodoItemPrototype.render = function() {
     return (
-        virt.createView("LinearLayout",
-            this.props.text,
+        virt.createView("View",
+            virt.createView("TextView", this.props.text),
             virt.createView("Button", {
                 onClick: this.props.onDestroy
             }, "x")
