@@ -41,10 +41,15 @@
 
         var virt = require(1),
             virtAndroid = require(57),
-            App = require(68);
+            WS = require(69),
+            App = require(70);
 
-        virtAndroid.androidInterface = global.__android__;
-        virtAndroid.render(virt.createView(App));
+
+        var socket = virtAndroid.socket = new WS("ws://127.0.0.1:8080");
+
+        socket.onopen = function onOpen() {
+            virtAndroid.render(virt.createView(App));
+        };
 
 
     },
@@ -1645,16 +1650,13 @@
                 this.isTopLevel = true;
             }
 
-            props = currentView.props;
+            props = this.__processProps(currentView.props);
             children = currentView.children;
-            context = currentView.__context;
+            context = this.__processContext(currentView.__context);
 
             component = new ComponentClass(props, children, context);
 
             this.component = component;
-
-            props = this.__processProps(props);
-            context = this.__processContext(context);
 
             component.__node = this;
             component.props = props;
@@ -1911,7 +1913,7 @@
 
         NodePrototype.__checkTypes = function(propTypes, props) {
             var localHas = has,
-                displayName = this.component.displayName,
+                displayName = this.__getName(),
                 propName, error;
 
             if (propTypes) {
@@ -1995,7 +1997,7 @@
 
                 if (childContextTypes) {
                     localHas = has;
-                    displayName = component.displayName;
+                    displayName = this.__getName();
 
                     for (contextName in childContext) {
                         if (!localHas(childContextTypes, contextName)) {
@@ -2027,6 +2029,18 @@
 
             if (isString(ref)) {
                 detachRef(ref, view.__owner);
+            }
+        };
+
+        NodePrototype.__getName = function() {
+            var type = this.currentView.type,
+                constructor;
+
+            if (isString(type)) {
+                return type;
+            } else {
+                constructor = this.component && this.component.constructor;
+                return type.displayName || (constructor && constructor.displayName) || null;
             }
         };
 
@@ -2826,22 +2840,22 @@
             AndroidAdaptor = require(58);
 
 
-        require(62);
-        require(65);
+        require(63);
         require(66);
         require(67);
+        require(68);
 
 
         var virtAndroid = exports,
             root = null;
 
 
-        virtAndroid.androidInterface = null;
+        virtAndroid.socket = null;
 
         virtAndroid.render = function(view) {
             if (root === null) {
                 root = new virt.Root();
-                root.adaptor = new AndroidAdaptor(root, virtAndroid.androidInterface);
+                root.adaptor = new AndroidAdaptor(root, virtAndroid.socket);
             }
 
             root.render(view);
@@ -2860,15 +2874,16 @@
     },
     function(require, exports, module, global) {
 
-        var MessengerAndroid = require(59),
-            consts = require(60);
+        var Messenger = require(59),
+            MessengerWebSocketAdaptor = require(60),
+            consts = require(61);
 
 
         module.exports = AndroidAdaptor;
 
 
-        function AndroidAdaptor(root, androidInterface) {
-            var messenger = new MessengerAndroid(androidInterface),
+        function AndroidAdaptor(root, socket) {
+            var messenger = new Messenger(new MessengerWebSocketAdaptor(socket)),
                 eventManager = root.eventManager,
                 events = eventManager.events;
 
@@ -2902,82 +2917,93 @@
     },
     function(require, exports, module, global) {
 
-        var defineProperty = require(24);
+        var MESSENGER_ID = 0,
+            MessengerPrototype;
 
 
-        module.exports = MessengerAndroid;
+        module.exports = Messenger;
 
 
-        function MessengerAndroid(androidInterface) {
-            var MESSAGE_ID = 0,
-                listeners = {},
-                messages = {};
+        function Messenger(adaptor) {
+            var _this = this;
 
-            if (!global.__onAndroidMessage__) {
-                defineProperty(global, "__onAndroidMessage__", {
-                    configurable: false,
-                    enumerable: false,
-                    writable: false,
-                    value: function onAndroidMessage(data) {
-                        var message = JSON.parse(data),
-                            id = message.id,
-                            name = message.name,
-                            callback = messages[id];
+            this.__id = (MESSENGER_ID++).toString(36);
+            this.__messageId = 0;
+            this.__callbacks = {};
+            this.__listeners = {};
 
-                        if (name) {
-                            if (listeners[name]) {
-                                emit(listeners[name], message.data, function callback(error, data) {
-                                    androidInterface.postMessage(JSON.stringify({
-                                        id: id,
-                                        error: error || undefined,
-                                        data: data
-                                    }));
-                                });
-                            }
-                        } else {
-                            if (callback) {
-                                callback(message.error, message.data);
-                                delete messages[id];
-                            }
-                        }
-                    }
-                });
+            this.__adaptor = adaptor;
+
+            adaptor.addMessageListener(function onMessage(data) {
+                _this.onMessage(data);
+            });
+        }
+        MessengerPrototype = Messenger.prototype;
+
+        MessengerPrototype.onMessage = function(message) {
+            var id = message.id,
+                name = message.name,
+                callbacks = this.__callbacks,
+                callback = callbacks[id],
+                listeners, adaptor;
+
+            if (name) {
+                listeners = this.__listeners;
+                adaptor = this.__adaptor;
+
+                if (listeners[name]) {
+                    emit(listeners[name], message.data, function callback(error, data) {
+                        adaptor.postMessage({
+                            id: id,
+                            error: error || undefined,
+                            data: data
+                        });
+                    });
+                }
+            } else {
+                if (callback && isMatch(id, this.__id)) {
+                    callback(message.error, message.data);
+                    delete callbacks[id];
+                }
+            }
+        };
+
+        MessengerPrototype.emit = function(name, data, callback) {
+            var id = this.__id + "-" + (this.__messageId++).toString(36);
+
+            if (callback) {
+                this.__callbacks[id] = callback;
             }
 
-            this.emit = function(name, data, callback) {
-                var id = MESSAGE_ID++;
+            this.__adaptor.postMessage({
+                id: id,
+                name: name,
+                data: data
+            });
+        };
 
-                if (callback) {
-                    messages[id] = callback;
-                }
+        MessengerPrototype.on = function(name, callback) {
+            var listeners = this.__listeners,
+                listener = listeners[name] || (listeners[name] = []);
 
-                androidInterface.postMessage(JSON.stringify({
-                    id: id,
-                    name: name,
-                    data: data
-                }));
-            };
+            listener[listener.length] = callback;
+        };
 
-            this.on = function(name, callback) {
-                var listener = listeners[name] || (listeners[name] = []);
-                listener[listener.length] = callback;
-            };
+        MessengerPrototype.off = function(name, callback) {
+            var listeners = this.__listeners,
+                listener = listeners[name],
+                i;
 
-            this.off = function(name, callback) {
-                var listener = listeners[name],
-                    i;
+            if (listener) {
+                i = listener.length;
 
-                if (listener) {
-                    i = listener.length;
-
-                    while (i--) {
-                        if (listener[i] === callback) {
-                            listener.splice(i, 1);
-                        }
+                while (i--) {
+                    if (listener[i] === callback) {
+                        listener.splice(i, 1);
                     }
                 }
-            };
-        }
+            }
+        };
 
         function emit(listeners, data, callback) {
             var index = 0,
@@ -3002,11 +3028,40 @@
             next(undefined, data);
         }
 
+        function isMatch(messageId, id) {
+            return messageId.split("-")[0] === id;
+        }
+
 
     },
     function(require, exports, module, global) {
 
-        var forEach = require(61),
+        var MessengerWebSocketAdaptorPrototype;
+
+
+        module.exports = MessengerWebSocketAdaptor;
+
+
+        function MessengerWebSocketAdaptor(socket) {
+            this.__socket = socket;
+        }
+        MessengerWebSocketAdaptorPrototype = MessengerWebSocketAdaptor.prototype;
+
+        MessengerWebSocketAdaptorPrototype.addMessageListener = function(callback) {
+            this.__socket.onmessage = function onMessage(data) {
+                callback(JSON.parse(data));
+            };
+        };
+
+        MessengerWebSocketAdaptorPrototype.postMessage = function(data) {
+            this.__socket.send(JSON.stringify(data));
+        };
+
+
+    },
+    function(require, exports, module, global) {
+
+        var forEach = require(62),
             keyMirror = require(27);
 
 
@@ -3119,8 +3174,8 @@
 
         var process = require(39);
         var virt = require(1),
-            some = require(63),
-            isNotPrimitive = require(64);
+            some = require(64),
+            isNotPrimitive = require(65);
 
 
         var View = virt.View,
@@ -3256,8 +3311,8 @@
 
         var process = require(39);
         var virt = require(1),
-            some = require(63),
-            isNotPrimitive = require(64);
+            some = require(64),
+            isNotPrimitive = require(65);
 
 
         var View = virt.View,
@@ -3320,10 +3375,60 @@
     },
     function(require, exports, module, global) {
 
+
+        /**
+         * Module dependencies.
+         */
+
+        var global = (function() {
+            return this;
+        })();
+
+        /**
+         * WebSocket constructor.
+         */
+
+        var WebSocket = global.WebSocket || global.MozWebSocket;
+
+        /**
+         * Module exports.
+         */
+
+        module.exports = WebSocket ? ws : null;
+
+        /**
+         * WebSocket constructor.
+         *
+         * The third `opts` options object gets ignored in web browsers, since it's
+         * non-standard, and throws a TypeError if passed to the constructor.
+         * See: https://github.com/einaros/ws/issues/227
+         *
+         * @param {String} uri
+         * @param {Array} protocols (optional)
+         * @param {Object) opts (optional)
+         * @api public
+         */
+
+        function ws(uri, protocols, opts) {
+            var instance;
+            if (protocols) {
+                instance = new WebSocket(uri, protocols);
+            } else {
+                instance = new WebSocket(uri);
+            }
+            return instance;
+        }
+
+        if (WebSocket) ws.prototype = WebSocket.prototype;
+
+
+    },
+    function(require, exports, module, global) {
+
         var virt = require(1),
-            propTypes = require(69),
-            TodoList = require(72),
-            TodoForm = require(78);
+            propTypes = require(71),
+            TodoList = require(74),
+            TodoForm = require(80);
 
 
         var AppPrototype;
@@ -3364,9 +3469,9 @@
     function(require, exports, module, global) {
 
         var isArray = require(6),
-            isRegExp = require(70),
+            isRegExp = require(72),
             isNullOrUndefined = require(4),
-            emptyFunction = require(71),
+            emptyFunction = require(73),
             isFunction = require(5),
             has = require(12),
             indexOf = require(40);
@@ -3586,9 +3691,9 @@
 
         var virt = require(1),
             map = require(13),
-            dispatcher = require(73),
-            TodoStore = require(75),
-            TodoItem = require(77);
+            dispatcher = require(75),
+            TodoStore = require(77),
+            TodoItem = require(79);
 
 
         var TodoListPrototype;
@@ -3666,7 +3771,7 @@
     },
     function(require, exports, module, global) {
 
-        var EventEmitter = require(74);
+        var EventEmitter = require(76);
 
 
         var dispatcher = module.exports = new EventEmitter(-1),
@@ -4066,9 +4171,9 @@
     },
     function(require, exports, module, global) {
 
-        var EventEmitter = require(74),
-            values = require(76),
-            dispatcher = require(73);
+        var EventEmitter = require(76),
+            values = require(78),
+            dispatcher = require(75);
 
 
         var TodoStore = module.exports = new EventEmitter(-1),
@@ -4194,7 +4299,7 @@
     function(require, exports, module, global) {
 
         var virt = require(1),
-            propTypes = require(69);
+            propTypes = require(71);
 
 
         var TodoItemPrototype;
@@ -4236,8 +4341,8 @@
     function(require, exports, module, global) {
 
         var virt = require(1),
-            dispatcher = require(73),
-            TodoStore = require(75);
+            dispatcher = require(75),
+            TodoStore = require(77);
 
 
         var TodoFormPrototype;

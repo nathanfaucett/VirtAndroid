@@ -29,6 +29,7 @@
     "prop_types": "git://github.com/nathanfaucett/prop_types",
     "values": "git://github.com/nathanfaucett/values",
     "virt": "git://github.com/nathanfaucett/virt",
-    "virt-android": "git://github.com/nathanfaucett/virt-android"
+    "virt-android": "git://github.com/nathanfaucett/virt-android",
+    "ws": "^0.7.1"
   }
 }
